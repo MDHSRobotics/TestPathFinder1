@@ -11,49 +11,36 @@ package frc.robot;
 import java.io.IOException;
 
 import edu.wpi.first.wpilibj.TimedRobot;
-import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import edu.wpi.first.wpilibj.Notifier;
 
-// Make sure you install the CTRE vendor library (should be installed locally)
 import com.ctre.phoenix.motorcontrol.ControlMode;
 import com.ctre.phoenix.motorcontrol.FeedbackDevice;
 import com.ctre.phoenix.motorcontrol.can.*;
 
-// Make sure you install the ADI vendor library
-//    http://maven.highcurrent.io/vendordeps/ADIS16448.json
 import com.analog.adis16448.frc.ADIS16448_IMU;
 
-// Make sure you install the Pathfinder vendor library from:
-//  http://dev.imjac.in/maven/jaci/pathfinder/PathfinderOLD-latest.json
 import jaci.pathfinder.Pathfinder;
 import jaci.pathfinder.PathfinderFRC;
 import jaci.pathfinder.Trajectory;
 import jaci.pathfinder.followers.EncoderFollower;
 
-/**
- * The VM is configured to automatically run this class, and to call the
- * functions corresponding to each mode, as described in the TimedRobot
- * documentation. If you change the name of this class or the package after
- * creating this project, you must also update the build.gradle file in the
- * project.
- */
 public class Robot extends TimedRobot {
 
-  // -----------------CONSTATNTS -----------------
+  // -----------------CONSTANTS ------------------
   // number of encoder counts per wheel revolution
-  private static final int k_ticks_per_rev = 4096;
+  private static final int TICKS_PER_REV = 4096;
   // diameter of the wheels
-  private static final double k_wheel_diameter = 4.0 / 12.0;
+  private static final double WHEEL_DIAMETER = 4.0 / 12.0;
   // maximum velocity of the robot
-  private static final double k_max_velocity = 10;
+  private static final double MAX_VELOCITY = 10;
   // port numbers for the left and right speed controllers
-  private static final int k_left_channel = 0;
-  private static final int k_right_channel = 1;
+  private static final int LEFT_TALON_ID = 0;
+  private static final int RIGHT_TALON_ID = 1;
 
   // name of this path
-  private static final String k_path_name = "example";
+  //TODO Change file name
+  private static final String TRAJECTORY_FILENAME_BASE = "example";
   
   // Default Talon and encoder constants:
   private static final int PID_LOOP_IDX = 0;
@@ -62,74 +49,40 @@ public class Robot extends TimedRobot {
   public static boolean SENSOR_PHASE = false;
   public static boolean MOTOR_INVERT = false;
 
+  // ------------- Class Members -------------
+
   // Speed controllers for left and right side
   private TalonSRX m_leftTalon;
   private TalonSRX m_rightTalon;
   // Gyro
-  private ADIS16448_IMU m_imu;
-  
+  private ADIS16448_IMU m_gryo;
   // Encoder followers for left and right side
-  private EncoderFollower m_left_follower;
-  private EncoderFollower m_right_follower;
+  private EncoderFollower m_leftFollower;
+  private EncoderFollower m_rightFollower;
   // Nofifier - this is what keeps the robot on the path
-  private Notifier m_follower_notifier;
+  private Notifier m_followerNotifier;
 
-  // Command chooser for use in SmartDashboard
-  private static final String kDefaultAuto = "Default";
-  private static final String kCustomAuto = "My Auto";
-  private String m_autoSelected;
-  private final SendableChooser<String> m_chooser = new SendableChooser<>();
-
-  /**
-   * This function is run when the robot is first started up and should be
-   * used for any initialization code.
-   */
   @Override
   public void robotInit() {
-    m_chooser.setDefaultOption("Default Auto", kDefaultAuto);
-    m_chooser.addOption("My Auto", kCustomAuto);
-    SmartDashboard.putData("Auto choices", m_chooser);
 
     // Set up the speed controllers
-    m_leftTalon = new TalonSRX(k_left_channel);
+    m_leftTalon = new TalonSRX(LEFT_TALON_ID);
     configureTalon(m_leftTalon);
-    m_rightTalon = new TalonSRX(k_right_channel);
+    m_rightTalon = new TalonSRX(RIGHT_TALON_ID);
     configureTalon(m_rightTalon);
 
     // Set up the gyro
-    m_imu = new ADIS16448_IMU();
-    m_imu.reset();
-    m_imu.calibrate();
+    m_gryo = new ADIS16448_IMU();
+    m_gryo.reset();
+    m_gryo.calibrate();
   }
 
-  /**
-   * This function is called every robot packet, no matter the mode. Use
-   * this for items like diagnostics that you want ran during disabled,
-   * autonomous, teleoperated and test.
-   *
-   * <p>This runs after the mode specific periodic functions, but before
-   * LiveWindow and SmartDashboard integrated updating.
-   */
   @Override
   public void robotPeriodic() {
   }
 
-  /**
-   * This autonomous (along with the chooser code above) shows how to select
-   * between different autonomous modes using the dashboard. The sendable
-   * chooser code works with the Java SmartDashboard. If you prefer the
-   * LabVIEW Dashboard, remove all of the chooser code and uncomment the
-   * getString line to get the auto name from the text box below the Gyro
-   *
-   * <p>You can add additional auto modes by adding additional comparisons to
-   * the switch structure below with additional strings. If using the
-   * SendableChooser make sure to add them to the chooser code above as well.
-   */
   @Override
   public void autonomousInit() {
-    m_autoSelected = m_chooser.getSelected();
-    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
-    System.out.println("Auto selected: " + m_autoSelected);
 
     /*
       1.  Create the trajectories for the left and right sides of the drivetrain. This will look for paths in the
@@ -143,13 +96,13 @@ public class Robot extends TimedRobot {
     Trajectory left_trajectory = null;
     Trajectory right_trajectory = null;
     try {
-      left_trajectory  = PathfinderFRC.getTrajectory(k_path_name + ".left");
+      left_trajectory  = PathfinderFRC.getTrajectory(TRAJECTORY_FILENAME_BASE + ".left");
     }
     catch (IOException e) { 
       System.out.println("Cannot find left trajectory");
     }
     try {
-     right_trajectory = PathfinderFRC.getTrajectory(k_path_name + ".right");
+     right_trajectory = PathfinderFRC.getTrajectory(TRAJECTORY_FILENAME_BASE + ".right");
     }
     catch (IOException e) { 
       System.out.println("Cannot find right trajectory");
@@ -159,31 +112,31 @@ public class Robot extends TimedRobot {
       2.  Create encoder followers from the left and right trajectories. The encoder followers compute
           the motor values based on where the robot is in the path.
     */
-    m_left_follower = new EncoderFollower(left_trajectory);
-    m_right_follower = new EncoderFollower(right_trajectory);
+    m_leftFollower = new EncoderFollower(left_trajectory);
+    m_rightFollower = new EncoderFollower(right_trajectory);
 
     /*
       3.  Configure the encoders used by the followers with the number of counts per wheel revolution
           and diameter and PID constants to tune how fast the follower reacts to changes in velocity.
     */
-    m_left_follower.configureEncoder(getEncoderPosition(m_leftTalon), k_ticks_per_rev, k_wheel_diameter);
+    m_leftFollower.configureEncoder(getEncoderPosition(m_leftTalon), TICKS_PER_REV, WHEEL_DIAMETER);
     // You must tune the PID values (kp, ki, kd, kv) on the following line!
-    m_left_follower.configurePIDVA(1.0, 0.0, 0.0, 1 / k_max_velocity, 0);
+    m_leftFollower.configurePIDVA(1.0, 0.0, 0.0, 1 / MAX_VELOCITY, 0);
     
-    m_right_follower.configureEncoder(getEncoderPosition(m_rightTalon), k_ticks_per_rev, k_wheel_diameter);
+    m_rightFollower.configureEncoder(getEncoderPosition(m_rightTalon), TICKS_PER_REV, WHEEL_DIAMETER);
     // You must tune the PID values (kp, ki, kd, kv) on the following line!
-    m_right_follower.configurePIDVA(1.0, 0.0, 0.0, 1 / k_max_velocity, 0);
+    m_rightFollower.configurePIDVA(1.0, 0.0, 0.0, 1 / MAX_VELOCITY, 0);
 
     /*
       4.  Create the notifier that will regularly call the followPath() method that computes the motor
           speeds and send them to the motors.
     */
-    m_follower_notifier = new Notifier(this::followPath);
-    m_follower_notifier.startPeriodic(left_trajectory.get(0).dt);
+    m_followerNotifier = new Notifier(this::followPath);
+    m_followerNotifier.startPeriodic(left_trajectory.get(0).dt);
   }
 
   /*
-    Notififier method that actually drives the motors
+    Notifier method that actually drives the motors
     Each delta time (value programmed into the notifier in the previous code segment) gets the current
     wheel speeds for the left and the right side. Use the predicted heading at each point and the actual
     robot heading from the gyro sensor. The difference between the actual and predicted heading is
@@ -191,18 +144,18 @@ public class Robot extends TimedRobot {
     path direction.
   */
   private void followPath() {
-    if (m_left_follower.isFinished() || m_right_follower.isFinished()) {
-      m_follower_notifier.stop();
+    if (m_leftFollower.isFinished() || m_rightFollower.isFinished()) {
+      m_followerNotifier.stop();
     } else {
       int leftEncoderPosition = getEncoderPosition(m_leftTalon);
       int rightEncoderPosition = getEncoderPosition(m_rightTalon);
 
-      double left_speed = m_left_follower.calculate(leftEncoderPosition);
-      double right_speed = m_right_follower.calculate(rightEncoderPosition);
+      double left_speed = m_leftFollower.calculate(leftEncoderPosition);
+      double right_speed = m_rightFollower.calculate(rightEncoderPosition);
 
       //TODO Make sure that this is the proper angle to retrieve from the IMU gyro
-      double heading = m_imu.getAngleZ();
-      double desired_heading = Pathfinder.r2d(m_left_follower.getHeading());
+      double heading = m_gryo.getAngleZ();
+      double desired_heading = Pathfinder.r2d(m_leftFollower.getHeading());
       double heading_difference = Pathfinder.boundHalfDegrees(desired_heading - heading);
       double turn = 0.8 * (-1.0/80.0) * heading_difference;
 
@@ -211,20 +164,9 @@ public class Robot extends TimedRobot {
     }
   }
 
-  /**
-   * This function is called periodically during autonomous.
-   */
   @Override
   public void autonomousPeriodic() {
-    switch (m_autoSelected) {
-      case kCustomAuto:
-        // Put custom auto code here
-        break;
-      case kDefaultAuto:
-      default:
-        // Put default auto code here
-        break;
-    }
+
   }
 
   /*
@@ -234,7 +176,7 @@ public class Robot extends TimedRobot {
   */
   @Override
   public void teleopInit() {
-    m_follower_notifier.stop();
+    m_followerNotifier.stop();
     m_leftTalon.set(ControlMode.PercentOutput, 0);
     m_rightTalon.set(ControlMode.PercentOutput, 0);
     }
@@ -253,7 +195,7 @@ public class Robot extends TimedRobot {
   public void testPeriodic() {
   }
 
-  // Configure the talons and the associated encoders
+  // Configure the talons and associated encoders
   private void configureTalon(TalonSRX talon){
 		// Choose the sensor and sensor direction
 		talon.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative, PID_LOOP_IDX, TIMEOUT_MS);
@@ -285,7 +227,7 @@ public class Robot extends TimedRobot {
 
   // Get current position of the encoder on the associated talon
   private int getEncoderPosition(TalonSRX talon) {
-    //TODO Make sure that this is the proper method to get the current position in ticks
+    //TODO Make sure that this is the proper method to get the current encoder position in ticks
     int ticks = talon.getSensorCollection().getQuadraturePosition();
     return ticks;
   }
