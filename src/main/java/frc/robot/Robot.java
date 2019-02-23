@@ -11,6 +11,8 @@ package frc.robot;
 import java.io.IOException;
 
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import edu.wpi.first.wpilibj.Notifier;
 
@@ -37,10 +39,6 @@ public class Robot extends TimedRobot {
   // port numbers for the left and right speed controllers
   private static final int LEFT_TALON_ID = 0;
   private static final int RIGHT_TALON_ID = 1;
-
-  // name of this path
-  //TODO Change file name
-  private static final String TRAJECTORY_FILENAME_BASE = "example";
   
   // Default Talon and encoder constants:
   private static final int PID_LOOP_IDX = 0;
@@ -62,8 +60,18 @@ public class Robot extends TimedRobot {
   // Nofifier - this is what keeps the robot on the path
   private Notifier m_followerNotifier;
 
+  // Trajectory files to choose from
+  private static final String TRAJECTORY_1 = "Straight 2 feet";
+  private static final String TRAJECTORY_2 = "Simple Curve";
+  private String m_trajectorySelected;
+  private final SendableChooser<String> m_trajectoryChooser = new SendableChooser<>();
+
   @Override
   public void robotInit() {
+
+    m_trajectoryChooser.setDefaultOption(TRAJECTORY_1, TRAJECTORY_1);
+    m_trajectoryChooser.addOption(TRAJECTORY_2, TRAJECTORY_2);
+    SmartDashboard.putData("Trajectory choices", m_trajectoryChooser);
 
     // Set up the speed controllers
     m_leftTalon = new TalonSRX(LEFT_TALON_ID);
@@ -84,6 +92,11 @@ public class Robot extends TimedRobot {
   @Override
   public void autonomousInit() {
 
+    // Get the trajectory filename from SmartDashboard
+    m_trajectorySelected = m_trajectoryChooser.getSelected();
+    // m_autoSelected = SmartDashboard.getString("Auto Selector", kDefaultAuto);
+    System.out.println("Trajectory selected: " + m_trajectorySelected);
+
     /*
       1.  Create the trajectories for the left and right sides of the drivetrain. This will look for paths in the
           /home/lvuser/deploy/paths folder on the roboRIO. If you choose the output directory in PathWeaver 
@@ -96,16 +109,22 @@ public class Robot extends TimedRobot {
     Trajectory left_trajectory = null;
     Trajectory right_trajectory = null;
     try {
-      left_trajectory  = PathfinderFRC.getTrajectory(TRAJECTORY_FILENAME_BASE + ".left");
+      // Note: PathWeaver V2019.3.1 has a known issue. The left and right paths are being swapped. 
+      //TODO Change the following line to "left" once the PathWeaver bug is fixed
+      left_trajectory  = PathfinderFRC.getTrajectory(m_trajectorySelected + ".right");
     }
     catch (IOException e) { 
-      System.out.println("Cannot find left trajectory");
+      System.out.println("Cannot find left trajectory for trajectory: " + m_trajectorySelected);
+      System.exit(1);
     }
     try {
-     right_trajectory = PathfinderFRC.getTrajectory(TRAJECTORY_FILENAME_BASE + ".right");
+      // Note: PathWeaver V2019.3.1 has a known issue. The left and right paths are being swapped. 
+      //TODO Change the following line to "right" once the PathWeaver bug is fixed
+      right_trajectory = PathfinderFRC.getTrajectory(m_trajectorySelected + ".left");
     }
     catch (IOException e) { 
-      System.out.println("Cannot find right trajectory");
+      System.out.println("Cannot find right trajectory for trajectory: " + m_trajectorySelected);
+      System.exit(1);
     }
 
     /*
@@ -156,6 +175,11 @@ public class Robot extends TimedRobot {
       //TODO Make sure that this is the proper angle to retrieve from the IMU gyro
       double heading = m_gryo.getAngleZ();
       double desired_heading = Pathfinder.r2d(m_leftFollower.getHeading());
+      // Note: PathWeaver V2019.3.1 has a known issue. The left and right paths are being swapped. 
+      // This bug potentially affects the desired_heading depending on the orientation of the gyro.
+      // If so, you may also need to invert the desired heading with the following fix:
+      //     double desired_heading = -Pathfinder.r2d(m_left_follower.getHeading());
+
       double heading_difference = Pathfinder.boundHalfDegrees(desired_heading - heading);
       double turn = 0.8 * (-1.0/80.0) * heading_difference;
 
