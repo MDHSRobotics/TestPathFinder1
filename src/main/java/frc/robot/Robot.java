@@ -14,13 +14,16 @@ import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
-import edu.wpi.first.wpilibj.AnalogGyro;
 import edu.wpi.first.wpilibj.Notifier;
 
+// Make sure you install the CTRE vendor library (should be installed locally)
 import com.ctre.phoenix.motorcontrol.ControlMode;
-// Make sure you install the CTRE vendor library
 import com.ctre.phoenix.motorcontrol.FeedbackDevice;
 import com.ctre.phoenix.motorcontrol.can.*;
+
+// Make sure you install the ADI vendor library
+//    http://maven.highcurrent.io/vendordeps/ADIS16448.json
+import com.analog.adis16448.frc.ADIS16448_IMU;
 
 // Make sure you install the Pathfinder vendor library from:
 //  http://dev.imjac.in/maven/jaci/pathfinder/PathfinderOLD-latest.json
@@ -49,10 +52,9 @@ public class Robot extends TimedRobot {
   private static final int k_left_channel = 0;
   private static final int k_right_channel = 1;
 
-  // analog input for the gyro (other gyros might be connected differently)
-  private static final int k_gyro_port = 0;
   // name of this path
   private static final String k_path_name = "example";
+  
   // Default Talon and encoder constants:
   private static final int PID_LOOP_IDX = 0;
   public static final int SLOT_IDX = 0;
@@ -64,7 +66,8 @@ public class Robot extends TimedRobot {
   private TalonSRX m_leftTalon;
   private TalonSRX m_rightTalon;
   // Gyro
-  private AnalogGyro m_gyro;
+  private ADIS16448_IMU m_imu;
+  
   // Encoder followers for left and right side
   private EncoderFollower m_left_follower;
   private EncoderFollower m_right_follower;
@@ -94,7 +97,9 @@ public class Robot extends TimedRobot {
     configureTalon(m_rightTalon);
 
     // Set up the gyro
-    m_gyro = new AnalogGyro(k_gyro_port);
+    m_imu = new ADIS16448_IMU();
+    m_imu.reset();
+    m_imu.calibrate();
   }
 
   /**
@@ -195,7 +200,8 @@ public class Robot extends TimedRobot {
       double left_speed = m_left_follower.calculate(leftEncoderPosition);
       double right_speed = m_right_follower.calculate(rightEncoderPosition);
 
-      double heading = m_gyro.getAngle();
+      //TODO Make sure that this is the proper angle to retrieve from the IMU gyro
+      double heading = m_imu.getAngleZ();
       double desired_heading = Pathfinder.r2d(m_left_follower.getHeading());
       double heading_difference = Pathfinder.boundHalfDegrees(desired_heading - heading);
       double turn = 0.8 * (-1.0/80.0) * heading_difference;
