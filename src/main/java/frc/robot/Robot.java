@@ -17,8 +17,11 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.AnalogGyro;
 import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.Notifier;
-import edu.wpi.first.wpilibj.Spark;
-import edu.wpi.first.wpilibj.SpeedController;
+
+import com.ctre.phoenix.motorcontrol.ControlMode;
+// Make sure you install the CTRE vendor library
+import com.ctre.phoenix.motorcontrol.FeedbackDevice;
+import com.ctre.phoenix.motorcontrol.can.*;
 
 // Make sure you install the Pathfinder vendor library from:
 //  http://dev.imjac.in/maven/jaci/pathfinder/PathfinderOLD-latest.json
@@ -54,16 +57,21 @@ public class Robot extends TimedRobot {
   private static final int k_gyro_port = 0;
   // name of this path
   private static final String k_path_name = "example";
-
-  private SpeedController m_left_motor;
-  private SpeedController m_right_motor;
+  // Speed controllers for left and right side
+  private TalonSRX m_left_motor;
+  private TalonSRX m_right_motor;
+  // Encoders for left and right side
   private Encoder m_left_encoder;
   private Encoder m_right_encoder;
+  // Gyro
   private AnalogGyro m_gyro;
+  // Encoder followers for left and right side
   private EncoderFollower m_left_follower;
   private EncoderFollower m_right_follower;
+  // Nofifier - this is what keeps the robot on the path
   private Notifier m_follower_notifier;
 
+  // Command chooser for use in SmartDashboard
   private static final String kDefaultAuto = "Default";
   private static final String kCustomAuto = "My Auto";
   private String m_autoSelected;
@@ -79,10 +87,13 @@ public class Robot extends TimedRobot {
     m_chooser.addOption("My Auto", kCustomAuto);
     SmartDashboard.putData("Auto choices", m_chooser);
 
-    m_left_motor = new Spark(k_left_channel);
-    m_right_motor = new Spark(k_right_channel);
+    // Set up the speed controllers
+    m_left_motor = new TalonSRX(k_left_channel);	
+    m_right_motor = new TalonSRX(k_right_channel);
+    // ... and encoders
     m_left_encoder = new Encoder(k_left_encoder_port_a, k_left_encoder_port_b);
     m_right_encoder = new Encoder(k_right_encoder_port_a, k_right_encoder_port_b);
+    // ... and the gyro
     m_gyro = new AnalogGyro(k_gyro_port);
   }
 
@@ -183,8 +194,8 @@ public class Robot extends TimedRobot {
       double desired_heading = Pathfinder.r2d(m_left_follower.getHeading());
       double heading_difference = Pathfinder.boundHalfDegrees(desired_heading - heading);
       double turn = 0.8 * (-1.0/80.0) * heading_difference;
-      m_left_motor.set(left_speed + turn);
-      m_right_motor.set(right_speed - turn);
+      m_left_motor.set(ControlMode.PercentOutput, left_speed + turn);
+      m_right_motor.set(ControlMode.PercentOutput, right_speed - turn);
     }
   }
 
@@ -212,8 +223,8 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopInit() {
     m_follower_notifier.stop();
-    m_left_motor.set(0);
-    m_right_motor.set(0);
+    m_left_motor.set(ControlMode.PercentOutput, 0);
+    m_right_motor.set(ControlMode.PercentOutput, 0);
     }
 
   /**
