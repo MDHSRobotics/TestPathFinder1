@@ -22,6 +22,8 @@ import com.ctre.phoenix.motorcontrol.can.*;
 
 import com.analog.adis16448.frc.ADIS16448_IMU;
 
+// Make sure you install the Pathfinder vendor library from:
+//  http://dev.imjac.in/maven/jaci/pathfinder/PathfinderOLD-latest.json
 import jaci.pathfinder.Pathfinder;
 import jaci.pathfinder.PathfinderFRC;
 import jaci.pathfinder.Trajectory;
