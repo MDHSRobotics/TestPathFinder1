@@ -65,6 +65,7 @@ public class Robot extends TimedRobot {
   // Trajectory files to choose from
   private static final String TRAJECTORY_1 = "Straight 2 feet";
   private static final String TRAJECTORY_2 = "Simple Curve";
+  private static final String TRAJECTORY_3 = "Left Rocket - Align Line 1";
   private String m_trajectorySelected;
   private final SendableChooser<String> m_trajectoryChooser = new SendableChooser<>();
 
@@ -73,6 +74,7 @@ public class Robot extends TimedRobot {
 
     m_trajectoryChooser.setDefaultOption(TRAJECTORY_1, TRAJECTORY_1);
     m_trajectoryChooser.addOption(TRAJECTORY_2, TRAJECTORY_2);
+    m_trajectoryChooser.addOption(TRAJECTORY_3, TRAJECTORY_3);
     SmartDashboard.putData("Trajectory choices", m_trajectoryChooser);
 
     // Set up the speed controllers
