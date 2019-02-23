@@ -15,7 +15,6 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 
 import edu.wpi.first.wpilibj.AnalogGyro;
-import edu.wpi.first.wpilibj.Encoder;
 import edu.wpi.first.wpilibj.Notifier;
 
 import com.ctre.phoenix.motorcontrol.ControlMode;
@@ -39,8 +38,9 @@ import jaci.pathfinder.followers.EncoderFollower;
  */
 public class Robot extends TimedRobot {
 
+  // -----------------CONSTATNTS -----------------
   // number of encoder counts per wheel revolution
-  private static final int k_ticks_per_rev = 1024;
+  private static final int k_ticks_per_rev = 4096;
   // diameter of the wheels
   private static final double k_wheel_diameter = 4.0 / 12.0;
   // maximum velocity of the robot
@@ -48,21 +48,21 @@ public class Robot extends TimedRobot {
   // port numbers for the left and right speed controllers
   private static final int k_left_channel = 0;
   private static final int k_right_channel = 1;
-  // port numbers for the encoders connected to the left and right side of the drivetrain
-  private static final int k_left_encoder_port_a = 0;
-  private static final int k_left_encoder_port_b = 1;
-  private static final int k_right_encoder_port_a = 2;
-  private static final int k_right_encoder_port_b = 3;
+
   // analog input for the gyro (other gyros might be connected differently)
   private static final int k_gyro_port = 0;
   // name of this path
   private static final String k_path_name = "example";
+  // Default Talon and encoder constants:
+  private static final int PID_LOOP_IDX = 0;
+  public static final int SLOT_IDX = 0;
+  public static final int TIMEOUT_MS = 30;
+  public static boolean SENSOR_PHASE = false;
+  public static boolean MOTOR_INVERT = false;
+
   // Speed controllers for left and right side
-  private TalonSRX m_left_motor;
-  private TalonSRX m_right_motor;
-  // Encoders for left and right side
-  private Encoder m_left_encoder;
-  private Encoder m_right_encoder;
+  private TalonSRX m_leftTalon;
+  private TalonSRX m_rightTalon;
   // Gyro
   private AnalogGyro m_gyro;
   // Encoder followers for left and right side
@@ -88,12 +88,12 @@ public class Robot extends TimedRobot {
     SmartDashboard.putData("Auto choices", m_chooser);
 
     // Set up the speed controllers
-    m_left_motor = new TalonSRX(k_left_channel);	
-    m_right_motor = new TalonSRX(k_right_channel);
-    // ... and encoders
-    m_left_encoder = new Encoder(k_left_encoder_port_a, k_left_encoder_port_b);
-    m_right_encoder = new Encoder(k_right_encoder_port_a, k_right_encoder_port_b);
-    // ... and the gyro
+    m_leftTalon = new TalonSRX(k_left_channel);
+    configureTalon(m_leftTalon);
+    m_rightTalon = new TalonSRX(k_right_channel);
+    configureTalon(m_rightTalon);
+
+    // Set up the gyro
     m_gyro = new AnalogGyro(k_gyro_port);
   }
 
@@ -161,11 +161,12 @@ public class Robot extends TimedRobot {
       3.  Configure the encoders used by the followers with the number of counts per wheel revolution
           and diameter and PID constants to tune how fast the follower reacts to changes in velocity.
     */
-    m_left_follower.configureEncoder(m_left_encoder.get(), k_ticks_per_rev, k_wheel_diameter);
-    // You must tune the PID values on the following line!
+    m_left_follower.configureEncoder(getEncoderPosition(m_leftTalon), k_ticks_per_rev, k_wheel_diameter);
+    // You must tune the PID values (kp, ki, kd, kv) on the following line!
     m_left_follower.configurePIDVA(1.0, 0.0, 0.0, 1 / k_max_velocity, 0);
-    m_right_follower.configureEncoder(m_right_encoder.get(), k_ticks_per_rev, k_wheel_diameter);
-    // You must tune the PID values on the following line!
+    
+    m_right_follower.configureEncoder(getEncoderPosition(m_rightTalon), k_ticks_per_rev, k_wheel_diameter);
+    // You must tune the PID values (kp, ki, kd, kv) on the following line!
     m_right_follower.configurePIDVA(1.0, 0.0, 0.0, 1 / k_max_velocity, 0);
 
     /*
@@ -188,14 +189,19 @@ public class Robot extends TimedRobot {
     if (m_left_follower.isFinished() || m_right_follower.isFinished()) {
       m_follower_notifier.stop();
     } else {
-      double left_speed = m_left_follower.calculate(m_left_encoder.get());
-      double right_speed = m_right_follower.calculate(m_right_encoder.get());
+      int leftEncoderPosition = getEncoderPosition(m_leftTalon);
+      int rightEncoderPosition = getEncoderPosition(m_rightTalon);
+
+      double left_speed = m_left_follower.calculate(leftEncoderPosition);
+      double right_speed = m_right_follower.calculate(rightEncoderPosition);
+
       double heading = m_gyro.getAngle();
       double desired_heading = Pathfinder.r2d(m_left_follower.getHeading());
       double heading_difference = Pathfinder.boundHalfDegrees(desired_heading - heading);
       double turn = 0.8 * (-1.0/80.0) * heading_difference;
-      m_left_motor.set(ControlMode.PercentOutput, left_speed + turn);
-      m_right_motor.set(ControlMode.PercentOutput, right_speed - turn);
+
+      m_leftTalon.set(ControlMode.PercentOutput, left_speed + turn);
+      m_rightTalon.set(ControlMode.PercentOutput, right_speed - turn);
     }
   }
 
@@ -223,8 +229,8 @@ public class Robot extends TimedRobot {
   @Override
   public void teleopInit() {
     m_follower_notifier.stop();
-    m_left_motor.set(ControlMode.PercentOutput, 0);
-    m_right_motor.set(ControlMode.PercentOutput, 0);
+    m_leftTalon.set(ControlMode.PercentOutput, 0);
+    m_rightTalon.set(ControlMode.PercentOutput, 0);
     }
 
   /**
@@ -239,5 +245,42 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void testPeriodic() {
+  }
+
+  // Configure the talons and the associated encoders
+  private void configureTalon(TalonSRX talon){
+		// Choose the sensor and sensor direction
+		talon.configSelectedFeedbackSensor(FeedbackDevice.CTRE_MagEncoder_Relative, PID_LOOP_IDX, TIMEOUT_MS);
+
+		// Set appropriately to ensure sensor is positive when output is positive
+		talon.setSensorPhase(SENSOR_PHASE);
+
+		// Set based on what direction you want forward/positive to be.
+		// This does not affect sensor phase.
+		talon.setInverted(MOTOR_INVERT);
+
+		// Set the peak and nominal outputs, 12V means full
+		talon.configNominalOutputForward(0, TIMEOUT_MS);
+		talon.configNominalOutputReverse(0, TIMEOUT_MS);
+		talon.configPeakOutputForward(1, TIMEOUT_MS);
+		talon.configPeakOutputReverse(-1, TIMEOUT_MS);
+		
+		// Lets grab the 360 degree position of the MagEncoder's absolute
+		// position, and initially set the relative sensor to match.
+		int absolutePosition = talon.getSensorCollection().getPulseWidthPosition();
+		// Mask out overflows, keep bottom 12 bits
+		absolutePosition &= 0xFFF;
+		if (SENSOR_PHASE)	absolutePosition *= -1;
+		if (MOTOR_INVERT)	absolutePosition *= -1;
+		
+		// Set the quadrature (relative) sensor to match absolute
+		talon.setSelectedSensorPosition(absolutePosition, PID_LOOP_IDX, TIMEOUT_MS);
+  }
+
+  // Get current position of the encoder on the associated talon
+  private int getEncoderPosition(TalonSRX talon) {
+    //TODO Make sure that this is the proper method to get the current position in ticks
+    int ticks = talon.getSensorCollection().getQuadraturePosition();
+    return ticks;
   }
 }
